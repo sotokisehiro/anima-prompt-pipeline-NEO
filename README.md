@@ -1,4 +1,5 @@
 ### 謝辞
+
 このスクリプトを構築するにあたっては、Crodyさん ([Civitai Profile](https://civitai.com/user/Crody)) の知見をほぼそのまま参考にさせて頂いています。
 
 # anima-prompt-pipeline
@@ -43,11 +44,11 @@
                └─────────────────────────────────┘
 ```
 
-| 形態 | 主な用途・特徴 | 起動方法 / エントリポイント |
-|---|---|---|
-| **1. CLI (CUI)** | スクリプト連携、ターミナル作業、動作確認 | `cd anima_pipeline && python run.py "プロンプト"` |
-| **2. Web GUI** | 単体起動の専用ブラウザUI、パラメータ調整、履歴保存/CSV | `anima_pipeline/run_web.bat` または `python app_web.py` (http://127.0.0.1:7865) |
-| **3. Forge NEO 拡張** | WebUI 完結、生成画面（txt2img / img2img）への 1 クリック転送 | Forge NEO の `extensions/` に配置・ジャンクション |
+| 形態                  | 主な用途・特徴                                               | 起動方法 / エントリポイント                                                     |
+| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| **1. CLI (CUI)**      | スクリプト連携、ターミナル作業、動作確認                     | `cd anima_pipeline && python run.py "プロンプト"`                               |
+| **2. Web GUI**        | 単体起動の専用ブラウザUI、パラメータ調整、履歴保存/CSV       | `anima_pipeline/run_web.bat` または `python app_web.py` (http://127.0.0.1:7865) |
+| **3. Forge NEO 拡張** | WebUI 完結、生成画面（txt2img / img2img）への 1 クリック転送 | Forge NEO の `extensions/` に配置・ジャンクション                               |
 
 ---
 
@@ -76,7 +77,7 @@
    - 入手元: Hugging Face [HDiffusion (John Steward)](https://huggingface.co/HDiffusion)
    - Danbooru タグ数データ (`danbooru.csv`) および Gelbooru タグデータ (`gelbooru.csv`)
 5. **画像生成環境**:
-   - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) または [SD WebUI Forge NEO](https://github.com/lllyasviel/stable-diffusion-webui-forge)
+   - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) または [SD WebUI Forge NEO](https://github.com/hirorohi03/EasyForgeNeo)
    - [Anima モデル一式](https://huggingface.co/circlestone-labs/Anima)（`anima-base-v1.0.safetensors`, `qwen_3_06b_base.safetensors`, `qwen_image_vae.safetensors`）
 
 ---
@@ -101,6 +102,7 @@ pip install -r anima_pipeline/requirements.txt
 ### 2. タグ CSV の配置
 
 HDiffusion からダウンロードした CSV をリポジトリ内の `anima_pipeline/data/raw/` に配置します。
+
 - `anima_pipeline/data/raw/danbooru.csv`
 - `anima_pipeline/data/raw/gelbooru.csv`
 
@@ -133,6 +135,7 @@ llama-server -m /path/to/gemma-4-it.gguf --port 8088 -c 8192 -ngl 99 -ot "\.ffn_
 ```
 
 > [!TIP]
+>
 > - `-ot "\.ffn_(up|down|gate)_exps\.=CPU"`: 巨大なエキスパート層をメインメモリ（RAM）へ逃がし、VRAM 不足（OOM）を防ぎます。
 > - `--reasoning-budget 0`: Gemma が長文の思考過程（Reasoning）を出力して JSON が途切れるのを防ぎます。
 > - Windows では `anima_pipeline/run_llm.bat` のモデルパスを書き換えて利用することも可能です。
@@ -156,6 +159,7 @@ python run.py --tags "fern,@kantoku" "公園のベンチに座る二人の少女
 ```
 
 **出力結果**:
+
 - `English`: 翻訳後の英文
 - `Anima prompt`: スナップ補正・整列済みの Anima 向けプロンプト
 - `Negative prompt`: 推奨ネガティブプロンプト
@@ -169,6 +173,7 @@ python run.py --tags "fern,@kantoku" "公園のベンチに座る二人の少女
 ブラウザ上でパラメータを調整しながら変換・履歴管理を行いたい場合に使用します。
 
 #### 起動方法
+
 - **Windows バッチ**: `anima_pipeline/run_web.bat` を実行（エクスプローラーからダブルクリック、または `anima_pipeline/` 内で実行）
 - **手動起動**:
   ```bash
@@ -178,6 +183,7 @@ python run.py --tags "fern,@kantoku" "公園のベンチに座る二人の少女
 - 起動後、ブラウザで **http://127.0.0.1:7865** にアクセスします。
 
 #### 主な特徴
+
 - **ステータス表示**: 画面上部で辞書の読み込み状態や Gemma サーバー（:8088）との接続状態を確認可能。
 - **パラメータ調整**: Temperature、Max Tokens、ファジー検索の閾値（Fuzzy Cutoff）をスライダーで変更可能。
 - **履歴とインポート/エクスポート**: 過去の変換結果がブラウザに自動保存され、いつでも再呼び出し可能。CSV 形式での保存・読み込みにも対応。
@@ -189,6 +195,7 @@ python run.py --tags "fern,@kantoku" "公園のベンチに座る二人の少女
 Stable Diffusion WebUI Forge NEO をお使いの場合、拡張機能として組み込むことで **WebUI 内部のタブで変換し、1クリックで txt2img / img2img に送信** できます。
 
 #### インストール方法（ジャンクション推奨）
+
 Forge NEO の `extensions/` フォルダへ本リポジトリをジャンクション（またはクローン）します。
 
 ```bat
@@ -197,6 +204,7 @@ mklink /J C:\path\to\sd-webui-forge-neo\extensions\anima-prompt-pipeline C:\path
 ```
 
 #### 使い方
+
 1. 前提として **辞書がビルド済み** であり、**Gemma サーバー（:8088）が起動中** であることを確認します。
 2. Forge NEO を起動します（初回起動時に `install.py` が必要なライブラリ `pyahocorasick`, `rapidfuzz` を Forge 環境へ自動導入します）。
 3. UI 上部に **「Anima Prompt」タブ** が追加されます。
