@@ -1,6 +1,6 @@
 ### 謝辞
 
-このスクリプトを構築するにあたっては、Crodyさん ([Civitai Profile](https://civitai.com/user/Crody)) の知見をほぼそのまま参考にさせて頂いています。
+このスクリプトを構築するにあたっては、Crodyさん ([Civitai Profile](https://civitai.com/user/Crody)) 及びTomiigoさん（[Github](https://github.com/Tomiigo/anima-prompt-pipeline))の知見をほぼそのまま参考にさせて頂いています。
 
 # anima-prompt-pipeline
 
