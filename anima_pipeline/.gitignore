@@ -96,6 +96,7 @@ cython_debug/
 
 # Raw datasets (danbooru.csv, gelbooru.csv etc.)
 /data/raw/*
+!/data/raw/README.md
 !/data/raw/.gitkeep
 
 # Generated Dictionaries
