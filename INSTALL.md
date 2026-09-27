@@ -48,13 +48,13 @@ Anima Prompt Pipeline は、日本語で入力したプロンプトを画像生�
 
 本リポジトリには容量やライセンスの都合上、**モデル重みや生データ CSV は同梱されていません**。以下のものを各自で準備してください。
 
-| 項目 | 説明・推奨バージョン | 入手先 / 補足 |
-|---|---|---|
-| **Python** | 3.10 以上 (3.10〜3.13) | [python.org](https://www.python.org/) |
-| **llama.cpp** | `llama-server` バイナリ | [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) から環境に合った最新版を取得 |
-| **Gemma 4 GGUF** | チャット・翻訳・整形用 LLM<br>推奨: `gemma-4-26B-A4B-it` または軽量な E2B などの公式 Instruct GGUF (`Q4_K_M`) | Hugging Face などの各配布元から取得 |
-| **タグ元データ CSV** | `danbooru.csv` および `gelbooru.csv` | Hugging Face [HDiffusion (John Steward)](https://huggingface.co/HDiffusion) より取得 |
-| **画像生成環境** | ComfyUI または Forge NEO、および Anima モデル一式 | [Anima Model (Hugging Face)](https://huggingface.co/circlestone-labs/Anima)（非商用ライセンス） |
+| 項目                 | 説明・推奨バージョン                                                                                          | 入手先 / 補足                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Python**           | 3.10 以上 (3.10〜3.13)                                                                                        | [python.org](https://www.python.org/)                                                             |
+| **llama.cpp**        | `llama-server` バイナリ                                                                                       | [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) から環境に合った最新版を取得 |
+| **Gemma 4 GGUF**     | チャット・翻訳・整形用 LLM<br>推奨: `gemma-4-26B-A4B-it` または軽量な E2B などの公式 Instruct GGUF (`Q4_K_M`) | Hugging Face などの各配布元から取得                                                               |
+| **タグ元データ CSV** | `danbooru.csv` および `gelbooru.csv`                                                                          | Hugging Face [HDiffusion (John Steward)](https://huggingface.co/HDiffusion) より取得              |
+| **画像生成環境**     | ComfyUI または Forge NEO、および Anima モデル一式                                                             | [Anima Model (Hugging Face)](https://huggingface.co/circlestone-labs/Anima)（非商用ライセンス）   |
 
 ---
 
@@ -71,7 +71,11 @@ git clone https://github.com/sotokisehiro/anima-prompt-pipeline.git
 cd anima-prompt-pipeline
 ```
 
----
+> [!TIP]
+> **Windows 向け一括自動セットアップ（推奨）**
+> Windows 環境をご利用の場合、リポジトリルートにある **`setup_dictionary.bat`** をダブルクリック（または実行）すると、
+> **タグ CSV の入手・配置（Step 2）から全 3 種類の辞書ビルド（Step 3）までを一括で自動実行** できます。
+> （手動で進めたい場合や Linux / macOS の場合は、以下の Step 2・Step 3 を順に実行してください）
 
 ### Step 2: タグ CSV の入手と配置
 
@@ -106,6 +110,7 @@ python ../build_anima_dictionary.py --danbooru data/raw/danbooru.csv --gelbooru 
 ```
 
 ビルドが完了すると、各出力先フォルダ（`data/dict/` 等）に以下のファイルが生成されます。
+
 - `alias_to_canonical.json` (別名から正規タグへのマッピング)
 - `anima_tags.jsonl` (正規タグのデータベース)
 - `vocab.txt`
@@ -118,6 +123,7 @@ Anima Prompt Pipeline は、翻訳とプロンプト生成をローカルの Gem
 **別のターミナルウィンドウを開き、llama-server を起動したままにしておきます。**
 
 > **重要**:
+>
 > - 待受ポートは **`8088`** です（`anima_pipeline/config.py` の既定値）。
 > - `-ot "\.ffn_(up|down|gate)_exps\.=CPU"` は巨大なエキスパート層を RAM に逃がす設定です。外すと VRAM 不足（Out of Memory）になります。
 > - `--reasoning-budget 0` は思考文（Reasoning）の出力を抑え、プロンプト生成の JSON を即座に返すための必須指定です。
@@ -145,6 +151,7 @@ llama-server -m /path/to/your/gemma-4-it.gguf --port 8088 -c 8192 -ngl 99 -ot "\
 リポジトリルート（`anima-prompt-pipeline/`）で実行します。
 
 **Windows (コマンドプロンプト):**
+
 ```bat
 python -m venv venv
 venv\Scripts\activate
@@ -153,6 +160,7 @@ pip install -r anima_pipeline\requirements.txt
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
@@ -161,6 +169,7 @@ pip install -r anima_pipeline\requirements.txt
 ```
 
 **Linux / macOS:**
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -200,6 +209,7 @@ Windows 用起動バッチ `anima_pipeline/run_web.bat` は、リポジトリル
 リポジトリルート（`anima-prompt-pipeline/`）で以下を実行します。
 
 **Windows:**
+
 ```bat
 python -m venv winvenv
 winvenv\Scripts\activate
@@ -210,6 +220,7 @@ pip install -r anima_pipeline\requirements.txt
 #### 2. Web GUI の起動
 
 **方法 1: バッチファイルから起動（Windows 推奨）**
+
 1. エクスプローラー等で `anima_pipeline` フォルダを開きます。
 2. `anima_pipeline/run_web.bat` をダブルクリック（またはカレントディレクトリを `anima_pipeline` にして実行）します。
 3. 自動で依存チェックが行われ、ブラウザで `http://127.0.0.1:7865` が立ち上がります。
@@ -217,14 +228,17 @@ pip install -r anima_pipeline\requirements.txt
 > **注意**: `run_web.bat` は必ず **`anima_pipeline` フォルダを作業ディレクトリとして実行** してください（リポジトリルートから叩くと `..\winvenv` の相対パスが狂います）。
 
 **方法 2: コマンドラインから手動起動 (Windows / Linux 共通)**
+
 ```bash
 # 仮想環境を有効化した状態で
 cd anima_pipeline
 python app_web.py
 ```
+
 起動後、ブラウザで `http://127.0.0.1:7865` にアクセスしてください。
 
 #### 3. Web GUI の主な機能
+
 - **リアルタイムステータス表示**: 辞書ファイルのロード状態や Gemma サーバー（ポート 8088）との疎通を上部バッジで確認可能
 - **パラメータ調整**: Temperature、Max Tokens、Fuzzy Cutoff（曖昧検索のしきい値）を GUI 上でスライダー調整可能
 - **履歴機能**: 過去の変換履歴をブラウザの LocalStorage に保存（CSV 形式での一括エクスポート / インポートにも対応）
@@ -236,8 +250,9 @@ python app_web.py
 画像生成 WebUI **Stable Diffusion WebUI Forge NEO** の画面内に専用タブ「Anima Prompt」を追加し、生成画面（txt2img / img2img）へ 1 クリックでプロンプトを転送できるようにする手順です。
 
 > **対象環境**:
+>
 > - Stable Diffusion WebUI Forge NEO（Gradio 4 / Python 3.13 環境）
-> ※ 従来の WebUI (Automatic1111) や Gradio 3 ベースの reForge とは仕様が異なります。
+>   ※ 従来の WebUI (Automatic1111) や Gradio 3 ベースの reForge とは仕様が異なります。
 
 #### 1. 拡張機能のインストール（2 通りの方法）
 
@@ -245,12 +260,15 @@ python app_web.py
 リポジトリの実体を複製せず、Forge NEO の `extensions` フォルダからリンクさせます。
 
 管理者権限のコマンドプロンプトで実行:
+
 ```bat
 mklink /J "C:\path\to\sd-webui-forge-neo\extensions\anima-prompt-pipeline" "C:\path\to\anima-prompt-pipeline"
 ```
+
 （例: `mklink /J C:\aiwork\sd-webui-forge-neo\extensions\anima-prompt-pipeline C:\aiwork2\anima-prompt-pipeline`）
 
 **方法 B: extensions フォルダ配下にクローンする**
+
 ```bash
 cd /path/to/sd-webui-forge-neo/extensions
 git clone https://github.com/sotokisehiro/anima-prompt-pipeline.git
@@ -314,11 +332,18 @@ C:\path\to\ComfyUI_windows_portable\python_embeded\python.exe -m pip install -r 
 本ツールが出力したプロンプトを各ツールへ適用する方法です。
 
 ### 1. ComfyUI で利用する場合
+<<<<<<< HEAD
 - カスタムノード（上記 D）を使う場合は、出力 `prompt` / `negative` を **CLIP Text Encode** の text 入力へ接続します。
 - ノードを使わず、CLI / Web GUI の出力を CLIP Text Encode に貼り付ける方法も代替として使えます（ポジティブ / ネガティブそれぞれ）。
+=======
+
+- 出力された **Anima 用プロンプト** を ComfyUI のポジティブプロンプト（CLIP Text Encode）に貼り付けます。
+- 出力された **ネガティブプロンプト** をネガティブプロンプト側に貼り付けます。
+>>>>>>> d15162a (BIGNNER.mdとINSTALL.mdにWindows向け一括セットアップバッチの利用方法を追加。setup_dictionary.batを新規作成し、辞書のセットアップ手順を自動化。)
 - モデルには Anima 公式（`anima-base-v1.0.safetensors` 等）と Qwen テキストエンコーダ・VAE を設定して生成を実行します。
 
 ### 2. Forge NEO で利用する場合
+
 - 「Anima Prompt」タブ内の **「txt2img へ送信」** を押すだけで、プロンプト入力欄に自動入力されます。
 - チェックポイントに Anima モデルを指定して生成を実行してください。
 
@@ -327,29 +352,35 @@ C:\path\to\ComfyUI_windows_portable\python_embeded\python.exe -m pip install -r 
 ## トラブルシューティング / よくある落とし穴
 
 ### Q1. 「Gemma サーバーに接続できません」「Connection refused」と表示される
+
 - `anima_pipeline/config.py` のデフォルトポートは **`8088`** です。`llama-server` を起動する際のポートが `--port 8088` になっているか確認してください（一部古いドキュメントで 8080 と表記されている場合がありますが、`8088` が正です）。
 - ターミナルで `llama-server` がエラーで終了していないか確認してください。
 
 ### Q2. Gemma 起動時に Out of Memory (VRAM不足) でクラッシュする
+
 - 起動引数に `-ot "\.ffn_(up|down|gate)_exps\.=CPU"` が含まれているか確認してください。これをつけることで、重たいエキスパート層をメインメモリ（RAM）へ退避できます。
 - VRAM 容量が極めて少ない場合、`-ngl 0` を指定して Gemma を完全に CPU 駆動にすることも可能です（画像生成側の VRAM を圧迫しません）。
 
 ### Q3. 出力結果に Gemma の思考文（箇条書きや `Thought:` 等）が混ざる・途中で切れる
+
 - Gemma 4 が推論プロセスをそのまま出力してしまい、JSON 出力に達していない状態です。
 - `llama-server` の起動オプションに必ず **`--reasoning-budget 0`** を付与してください。
 - それでも思考が混入する場合は、追加引数として `--chat-template-kwargs "{\"enable_thinking\": false}"` を渡してください。
 
 ### Q4. Windows の PowerShell で `Activate.ps1` を実行するとエラーになる
+
 - PowerShell のスクリプト実行ポリシーによる制限です。管理者権限または当該ターミナルセッションで以下を実行して許可してください。
   ```powershell
   Set-ExecutionPolicy -Scope Process RemoteSigned
   ```
 
 ### Q5. `run_web.bat` を実行するとモジュールが見つからない等のエラーが出る
+
 - リポジトリのルートフォルダから実行していませんか？ `run_web.bat` は `anima_pipeline` ディレクトリ内で実行されることを前提に相対パス（`..\winvenv`）を解決します。`cd anima_pipeline` してから実行するか、エクスプローラーから `anima_pipeline` フォルダ内のバッチをダブルクリックしてください。
 - 仮想環境のフォルダ名が `winvenv` 以外になっている場合は、`winvenv` という名前で作成し直すか、バッチ内のパスを編集してください。
 
 ### Q6. Forge NEO でジャンクションした際、JavaScript やスタイルが 403 Forbidden になる
+
 - 本拡張の `scripts/anima_prompt_pipeline.py` にてジャンクション実パスを Gradio の許可パス (`cmd_opts.gradio_allowed_path`) に自動追加する対策が組み込まれています。拡張機能が最新の状態になっていることを確認してください。
 
 ### Q7. ComfyUI にノードが表示されない
