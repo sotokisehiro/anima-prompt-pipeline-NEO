@@ -23,7 +23,8 @@ class ChatClient:
              temperature: float | None = None,
              max_tokens: int | None = None,
              top_p: float = 0.95, top_k: int = 64,
-             base_url: str | None = None) -> str:
+             base_url: str | None = None,
+             seed: int | None = None) -> str:
         if temperature is None:
             temperature = config.GEN_TEMPERATURE
         if max_tokens is None:
@@ -36,6 +37,8 @@ class ChatClient:
             "max_tokens": max_tokens,
             "stream": False,
         }
+        if seed is not None:
+            payload["seed"] = seed                # llama-server の拡張(再現性用)
         if response_format is not None:
             payload["response_format"] = response_format
         if grammar is not None:
@@ -52,7 +55,8 @@ class ChatClient:
         return content
 
     def translate_ja_en(self, ja_text: str, temperature: float = 0.1,
-                        base_url: str | None = None) -> str:
+                        base_url: str | None = None,
+                        seed: int | None = None) -> str:
         messages = [
             {"role": "system", "content":
                 "You are a translator. Translate the user's Japanese image "
@@ -61,4 +65,4 @@ class ChatClient:
             {"role": "user", "content": ja_text},
         ]
         return self.chat(messages, temperature=temperature, max_tokens=300,
-                         base_url=base_url).strip()
+                         base_url=base_url, seed=seed).strip()

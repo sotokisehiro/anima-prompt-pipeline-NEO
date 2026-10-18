@@ -1,1 +1,5 @@
+# ComfyUI カスタムノード用の依存(ComfyUI の Python に入れる)。
+# 辞書ビルド用の pandas は含まない(README 参照)。
 requests
+pyahocorasick>=2.0
+rapidfuzz>=3.0

@@ -1,10 +1,11 @@
 # Anima Prompt Pipeline インストールガイド (INSTALL.md)
 
-本ドキュメントでは、**Anima Prompt Pipeline** の導入手順を、以下の 3 つの利用形態に合わせて詳しく解説します。
+本ドキュメントでは、**Anima Prompt Pipeline** の導入手順を、以下の 4 つの利用形態に合わせて詳しく解説します。
 
 1. **CUI (コマンドライン)** — ターミナルからスクリプトを実行してプロンプトを変換
 2. **Web GUI (FastAPI / ブラウザ)** — ローカル Web サーバーを起動し、ブラウザ UI から変換・履歴管理
 3. **SD WebUI 拡張機能 (Forge NEO)** — Stable Diffusion WebUI Forge NEO の「Anima Prompt」タブから直接変換して txt2img / img2img に送信
+4. **ComfyUI カスタムノード** — ComfyUI のワークフロー内でノードとして変換し、`CLIPTextEncode` へ接続
 
 ---
 
@@ -21,6 +22,7 @@
    - [A. CUI (コマンドライン) で使う場合](#a-cui-コマンドライン-で使う場合)
    - [B. Web GUI (ブラウザ) で使う場合](#b-web-gui-ブラウザ-で使う場合)
    - [C. SD WebUI (Forge NEO) 拡張機能として使う場合](#c-sd-webui-forge-neo-拡張機能として使う場合)
+   - [D. ComfyUI カスタムノードとして使う場合](#d-comfyui-カスタムノードとして使う場合)
 5. [画像生成へのプロンプト適用](#画像生成へのプロンプト適用)
 6. [トラブルシューティング / よくある落とし穴](#トラブルシューティング--よくある落とし穴)
 7. [関連ドキュメント](#関連ドキュメント)
@@ -58,7 +60,7 @@ Anima Prompt Pipeline は、日本語で入力したプロンプトを画像生�
 
 ## 共通セットアップ（全形態で必須）
 
-どの利用形態（CUI / GUI / 拡張機能）でも、**「タグ CSV の配置」「辞書ビルド」「Gemma サーバーの起動」** は共通して必要となります。
+どの利用形態（CUI / GUI / Forge 拡張 / ComfyUI ノード）でも、**「タグ CSV の配置」「辞書ビルド」「Gemma サーバーの起動」** は共通して必要となります。
 
 ### Step 1: リポジトリの配置
 
@@ -272,13 +274,48 @@ Forge NEO を通常通り起動します（`run.bat` 等）。
 
 ---
 
+### D. ComfyUI カスタムノードとして使う場合
+
+ComfyUI のワークフロー内に「Anima Prompt Pipeline (日本語→Anima)」ノードを追加します。
+
+#### 1. ノードの配置
+`ComfyUI/custom_nodes/` に本リポジトリを clone、またはリンクします。
+
+```bash
+# Linux
+ln -s /path/to/anima-prompt-pipeline /path/to/ComfyUI/custom_nodes/anima-prompt-pipeline
+```
+```bat
+:: Windows（管理者権限）
+mklink /J C:\path\to\ComfyUI\custom_nodes\anima-prompt-pipeline C:\path\to\anima-prompt-pipeline
+```
+
+#### 2. 依存のインストール（ComfyUI の Python に入れる）
+```bash
+# Linux venv
+/path/to/ComfyUI/venv/bin/python -m pip install -r /path/to/anima-prompt-pipeline/requirements.txt
+```
+```bat
+:: Windows portable 版
+C:\path\to\ComfyUI_windows_portable\python_embeded\python.exe -m pip install -r C:\path\to\anima-prompt-pipeline\requirements.txt
+```
+辞書のビルドには pandas が必要なため、ビルドだけ別の venv で行っても構いません（辞書ファイルは共通）。
+
+#### 3. 使い方
+- 辞書をビルドし Gemma サーバーを起動した状態で ComfyUI を再起動すると、カテゴリ `AnimaPrompt` にノードが現れます。
+- 出力 `prompt` / `negative` を `CLIPTextEncode` の text 入力へ接続します。結果の確認は `PreviewAny` が便利です。
+- `server_url` を空にすると保存済み設定（無ければ既定 :8088）を使います。`save_server_url` を True にすると、非空の `server_url` を `user_data/settings.json` に保存します。
+- `seed` を変えると再生成、同じ入力ならキャッシュされ Gemma は再実行されません。
+
+---
+
 ## 画像生成へのプロンプト適用
 
 本ツールが出力したプロンプトを各ツールへ適用する方法です。
 
 ### 1. ComfyUI で利用する場合
-- 出力された **Anima 用プロンプト** を ComfyUI のポジティブプロンプト（CLIP Text Encode）に貼り付けます。
-- 出力された **ネガティブプロンプト** をネガティブプロンプト側に貼り付けます。
+- カスタムノード（上記 D）を使う場合は、出力 `prompt` / `negative` を **CLIP Text Encode** の text 入力へ接続します。
+- ノードを使わず、CLI / Web GUI の出力を CLIP Text Encode に貼り付ける方法も代替として使えます（ポジティブ / ネガティブそれぞれ）。
 - モデルには Anima 公式（`anima-base-v1.0.safetensors` 等）と Qwen テキストエンコーダ・VAE を設定して生成を実行します。
 
 ### 2. Forge NEO で利用する場合
@@ -314,6 +351,16 @@ Forge NEO を通常通り起動します（`run.bat` 等）。
 
 ### Q6. Forge NEO でジャンクションした際、JavaScript やスタイルが 403 Forbidden になる
 - 本拡張の `scripts/anima_prompt_pipeline.py` にてジャンクション実パスを Gradio の許可パス (`cmd_opts.gradio_allowed_path`) に自動追加する対策が組み込まれています。拡張機能が最新の状態になっていることを確認してください。
+
+### Q7. ComfyUI にノードが表示されない
+- `custom_nodes/` 直下に本リポジトリ（`__init__.py` があるフォルダ）が置かれているか、置いた後に ComfyUI を再起動したかを確認してください。起動ログに `anima-prompt-pipeline` の import エラーが出ていないかも確認します。
+- ComfyUI-Manager 経由の場合はルート `requirements.txt` が読まれますが、手動配置では自動インストールされません。
+
+### Q8. ComfyUI で「依存パッケージが不足しています」と出る
+- ComfyUI が使っている Python に `pip install -r requirements.txt`（ルート直下）を実行してください。別の Python に入れても効きません（portable 版は `python_embeded\python.exe -m pip ...`）。
+
+### Q9. ComfyUI で「Gemma サーバーに接続できません」と出る
+- llama-server が起動しているか確認し、ノードの `server_url`（空なら保存済み設定 > 既定 :8088）が正しいか確認してください。`save_server_url` を True にすると、Web GUI / Forge と共有する設定として保存されます。
 
 ---
 
