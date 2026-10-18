@@ -268,12 +268,15 @@ class AnimaPipeline:
     # -- 実行 -----------------------------------------------------------------
     def run(self, ja_prompt: str, extra_tags: list[str] | None = None, *,
             temperature: float | None = None, max_tokens: int | None = None,
-            translate: bool | None = None) -> dict:
+            translate: bool | None = None, chat_url: str | None = None,
+            seed: int | None = None) -> dict:
         use_translate = translate if translate is not None else self.translate
-        english = self.chat.translate_ja_en(ja_prompt) if use_translate else ja_prompt
+        english = (self.chat.translate_ja_en(ja_prompt, base_url=chat_url, seed=seed)
+                   if use_translate else ja_prompt)
 
         content = self.chat.chat(self._messages(english),
-                                 temperature=temperature, max_tokens=max_tokens)
+                                 temperature=temperature, max_tokens=max_tokens,
+                                 base_url=chat_url, seed=seed)
         obj = _loads_json_obj(content)
         if not isinstance(obj, dict):
             obj = {"tags": [], "natural": ""}

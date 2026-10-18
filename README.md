@@ -12,23 +12,23 @@
 
 ---
 
-## 3 つの利用形態
+## 4 つの利用形態
 
-本プロジェクトは共通の変換パイプライン（`anima_pipeline`）をベースに、以下の **3 つの異なるインターフェース** を提供しています。用途や作業環境に合わせて選んで利用できます。
+本プロジェクトは共通の変換パイプライン（`anima_pipeline`）をベースに、CLI / Web GUI / Forge NEO 拡張 / ComfyUI カスタムノードの **4 つのインターフェース** を提供しています。用途や作業環境に合わせて選んで利用できます。
 
 ```
                     ┌─────────────────────────┐
                     │     ユーザーの日本語入力   │
                     └───────────┬─────────────┘
                                 │
-        ┌───────────────────────┼───────────────────────┐
-        ▼                       ▼                       ▼
-【1. CLI (CUI)】         【2. Web GUI】      【3. Forge NEO 拡張機能】
-ターミナルから 1 行実行    ブラウザで手軽に変換      Forge NEO 画面内で変換
-出力をコピーして使用       履歴保存・パラメータ調整  txt2img/img2img へ直接転送
-        │                       │                       │
-        └───────────────────────┼───────────────────────┘
-                                ▼
+      ┌──────────────┬──────────┴───┬──────────────────┐
+      ▼              ▼              ▼                  ▼
+【1. CLI (CUI)】 【2. Web GUI】 【3. Forge NEO 拡張】 【4. ComfyUI ノード】
+ターミナルで     ブラウザで変換  Forge NEO 画面内で   ワークフロー内で変換
+1 行実行         履歴保存・調整  txt2img/img2img転送  CLIPTextEncode へ接続
+      │              │              │                  │
+      └──────────────┴──────┬───────┴──────────────────┘
+                            ▼
                ┌─────────────────────────────────┐
                │    共通パイプライン & ローカル    │
                │  ・Gemma (llama-server :8088)   │
@@ -49,6 +49,7 @@
 | **1. CLI (CUI)**      | スクリプト連携、ターミナル作業、動作確認                     | `cd anima_pipeline && python run.py "プロンプト"`                               |
 | **2. Web GUI**        | 単体起動の専用ブラウザUI、パラメータ調整、履歴保存/CSV       | `anima_pipeline/run_web.bat` または `python app_web.py` (http://127.0.0.1:7865) |
 | **3. Forge NEO 拡張** | WebUI 完結、生成画面（txt2img / img2img）への 1 クリック転送 | Forge NEO の `extensions/` に配置・ジャンクション                               |
+| **4. ComfyUI ノード** | ワークフロー内で変換し `CLIPTextEncode` へ直結（履歴機能なし） | ComfyUI の `custom_nodes/` に配置・リンク（ルート `requirements.txt` を導入）   |
 
 ---
 
@@ -76,7 +77,7 @@
 4. **タグ元データ CSV（2 種類）**:
    - 入手元: Hugging Face [HDiffusion (John Steward)](https://huggingface.co/HDiffusion)
    - Danbooru タグ数データ (`danbooru.csv`) および Gelbooru タグデータ (`gelbooru.csv`)
-5. **画像生成環境**:
+5. **画像生成環境**（ComfyUI ノード版は ComfyUI 本体が必須）:
    - [ComfyUI](https://github.com/comfyanonymous/ComfyUI) または [SD WebUI Forge NEO](https://github.com/hirorohi03/EasyForgeNeo)
    - [Anima モデル一式](https://huggingface.co/circlestone-labs/Anima)（`anima-base-v1.0.safetensors`, `qwen_3_06b_base.safetensors`, `qwen_image_vae.safetensors`）
 
@@ -164,7 +165,7 @@ python run.py --tags "fern,@kantoku" "公園のベンチに座る二人の少女
 - `Anima prompt`: スナップ補正・整列済みの Anima 向けプロンプト
 - `Negative prompt`: 推奨ネガティブプロンプト
 
-これらをコピーして ComfyUI 等のプロンプト入力欄へ貼り付けて使用します。
+これらをコピーして ComfyUI / Forge NEO 等のプロンプト入力欄へ貼り付けて使用します（ComfyUI ではカスタムノード版を使うと貼り付け不要です。後述）。
 
 ---
 
@@ -213,11 +214,62 @@ mklink /J C:\path\to\sd-webui-forge-neo\extensions\anima-prompt-pipeline C:\path
 
 ---
 
+### 4. ComfyUI カスタムノードモード
+
+ComfyUI のワークフロー内で「Anima Prompt Pipeline (日本語→Anima)」ノードとして使えます。出力を `CLIPTextEncode` の text 入力へ接続して、そのまま画像生成まで行えます。
+
+#### インストール方法
+
+本リポジトリを ComfyUI の `custom_nodes/` に置きます（clone、またはリンク）。
+
+```bash
+# Linux / macOS
+cd ComfyUI/custom_nodes
+git clone <このリポジトリの URL> anima-prompt-pipeline
+# 開発用にリンクする場合
+ln -s /path/to/anima-prompt-pipeline anima-prompt-pipeline
+```
+
+```bat
+:: Windows（管理者権限のコマンドプロンプト）
+mklink /J C:\path\to\ComfyUI\custom_nodes\anima-prompt-pipeline C:\path\to\anima-prompt-pipeline
+```
+
+依存パッケージは **ComfyUI が使っている Python** にインストールします（ルートの `requirements.txt` は requests / pyahocorasick / rapidfuzz のみ）。
+
+```bash
+# Linux venv の例
+/path/to/ComfyUI/venv/bin/python -m pip install -r /path/to/anima-prompt-pipeline/requirements.txt
+```
+
+```bat
+:: Windows portable 版の例
+C:\path\to\ComfyUI_windows_portable\python_embeded\python.exe -m pip install -r C:\path\to\anima-prompt-pipeline\requirements.txt
+```
+
+辞書は従来どおりビルドします（上の「共通セットアップ」）。ビルドには pandas が必要なため、ComfyUI とは別の venv で作っても構いません。
+
+#### 使い方
+
+1. **辞書がビルド済み** で、**Gemma サーバー（:8088）が起動中** であることを確認し、ComfyUI を再起動します。
+2. ノード追加メニュー（カテゴリ `AnimaPrompt`）から「Anima Prompt Pipeline (日本語→Anima)」を追加します。
+3. 入力: `ja_prompt`（日本語）/ `extra_tags` / `translate` / `temperature` / `max_tokens` / `fuzzy_cutoff` / `seed`。任意で `server_url`（空なら保存済み設定 > 既定）と `save_server_url`（True かつ `server_url` 非空のときだけ `user_data/settings.json` に保存）。
+4. 出力: `prompt` / `negative` / `english` / `issues`（4 つとも STRING）。`prompt` と `negative` を `CLIPTextEncode` の text 入力に接続します（入力側を「入力へ変換」して接続）。
+5. 結果の確認は `PreviewAny` ノードに接続するのが手軽です。
+6. `seed` を変えると再生成されます。入力が同じなら ComfyUI のキャッシュにより Gemma は再実行されません。
+
+---
+
 ## 設定のカスタマイズ
 
 主要な設定は [`anima_pipeline/config.py`](anima_pipeline/config.py) に集約されています。
 
-- `CHAT_URL`: Gemma サーバーのエンドポイント（既定: `http://127.0.0.1:8088`）
+- `CHAT_URL`: Gemma サーバーのエンドポイントの **既定値**（`http://127.0.0.1:8088`）。ソースを書き換えなくても、次の方法で変更できます。
+  - Web GUI: 「詳細設定」の「Gemma サーバー URL」
+  - Forge 拡張: 「Anima Prompt」タブの「サーバー設定」
+  - ComfyUI ノード: `server_url`（空なら保存済み設定 > `CHAT_URL`）。`save_server_url` を True にすると保存
+  - CLI: `python run.py --server http://192.168.1.10:8088 "..."`（1 回限り・保存しない）
+  - Web GUI / Forge / ComfyUI ノードで保存した値は `user_data/settings.json` に書かれ、次回起動時に読み込まれます（各入口で共有）。優先順位は `--server` > 保存済み設定 > `CHAT_URL`
 - `SNAP_FUZZY_CUTOFF`: ファジー照合の類似度しきい値（既定: `90`）
 - `SNAP_MAX_WORDS`: スナップ補正の対象とする単語数の上限（既定: `4`）
 - `USE_ARTIST_DICT` / `USE_CHAR_DICT`: 辞書による自動抽出の有効/無効

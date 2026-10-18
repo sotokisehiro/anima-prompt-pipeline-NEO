@@ -6,14 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 日本語で書いたプロンプトを、ローカルの Gemma(llama.cpp 経由)で英語に翻訳し、Danbooru/Gelbooru 由来の辞書と Anima 用ルールを使って、画像生成モデル [Anima](https://huggingface.co/circlestone-labs/Anima) 向けのプロンプトへ整形するツール。画像生成そのものは ComfyUI / Forge 側で行い、このツールが出すのは「整形済みのプロンプト文字列 + ネガティブプロンプト」のみ。
 
-入口は3つ(いずれも同じ `anima_pipeline` パッケージを呼ぶ):
+入口は4つ(いずれも同じ `anima_pipeline` パッケージを呼ぶ):
 
 - CLI: `anima_pipeline/run.py`
 - FastAPI Web GUI: `anima_pipeline/app_web.py` + `anima_pipeline/web/`
 - Stable Diffusion WebUI **Forge NEO** 拡張: リポジトリルートを `extensions/` にジャンクションし、`scripts/anima_prompt_pipeline.py` が「Anima Prompt」タブを追加
+- ComfyUI カスタムノード: リポジトリルートを `custom_nodes/` に置く(clone / リンク)。ルート `__init__.py` → `comfyui/nodes.py` の `AnimaPromptPipeline` ノード
 
 - `main` ブランチ: CLI 版のみ
-- `gui_dev` ブランチ(現在の作業ブランチ): Web GUI + Forge 拡張
+- `gui_dev` ブランチ: Web GUI + Forge 拡張
+- `llm_server` ブランチ: サーバー URL 設定(`settings_store`)の追加
+- `comfyui` ブランチ(現在の作業ブランチ): ComfyUI カスタムノードの追加
 
 ライセンス上の注意(`NOTICE.md` 参照): このリポジトリのコードは MIT だが、Anima 本体は非商用ライセンス、タグ CSV は HDiffusion 由来で本リポジトリには同梱していない。Gemma は公式 instruct を推奨(`NOTICE.md`)。`run_llm.bat` の Huihui/abliterated ファイル名は手順の手本にしない。
 
@@ -41,15 +44,25 @@ python ../build_anima_dictionary.py --danbooru data/raw/danbooru.csv --gelbooru 
 
 # Forge NEO へジャンクション(管理者 cmd。開発用)
 mklink /J C:\aiwork\sd-webui-forge-neo\extensions\anima-prompt-pipeline C:\aiwork2\anima-prompt-pipeline
+
+# ComfyUI へリンク(開発用。Linux は ln -s、Windows は管理者 cmd の mklink /J)
+ln -s /path/to/anima-prompt-pipeline /path/to/ComfyUI/custom_nodes/anima-prompt-pipeline
+mklink /J C:\path\to\ComfyUI\custom_nodes\anima-prompt-pipeline C:\path\to\anima-prompt-pipeline
+
+# ComfyUI の Python へ依存導入(自動インストールはされない。別 Python に入れても効かない)
+/path/to/ComfyUI/venv/bin/python -m pip install -r requirements.txt
+C:\path\to\ComfyUI_windows_portable\python_embeded\python.exe -m pip install -r requirements.txt
 ```
 
 - Windows の venv はリポジトリルートの `winvenv\`(git 管理外)。`run_web.bat` はこの venv の pip/python を直接呼ぶ(`..\winvenv\Scripts\pip.exe` / `python.exe`)。PowerShell では `Activate.ps1`(実行ポリシーで落ちやすい)
-- 実依存は `anima_pipeline/requirements.txt`(numpy, requests, pyahocorasick, rapidfuzz, rank-bm25, pandas, fastapi, uvicorn)。ルート直下の `requirements.txt` は `requests` のみの最小構成。Forge の `install.py` は `pyahocorasick`/`rapidfuzz` だけ入れる
+- 実依存は `anima_pipeline/requirements.txt`(numpy, requests, pyahocorasick, rapidfuzz, rank-bm25, pandas, fastapi, uvicorn)。ルート直下の `requirements.txt` は ComfyUI の Python 向け(requests / pyahocorasick / rapidfuzz)。Forge の `install.py` は `pyahocorasick`/`rapidfuzz` だけ入れる
 - テスト・リンタ・CI は存在しない。Forge 拡張の送信 JS はジャンクション時に `javascript/` の realpath を `gradio_allowed_path` へ足さないと `/file=` が 403 になる
 
 ## アーキテクチャ
 
 ```
+__init__.py              # ComfyUI カスタムノードの入口(ComfyUI 専用。重い import をしない)
+comfyui/nodes.py         # AnimaPromptPipeline ノード(service は実行時に遅延 import)
 anima_pipeline/          # パイプライン本体パッケージ
   pipeline.py            # AnimaPipeline.run() — 6段階の中心
   generate.py            # ChatClient(llama-server /v1/chat/completions)
@@ -57,6 +70,7 @@ anima_pipeline/          # パイプライン本体パッケージ
   constrain.py           # render / validate
   config.py              # 全設定。パスはこのファイルからの相対解決。.env 無し
   service.py             # スレッドセーフな AnimaPipeline キャッシュ(キーは fuzzy_cutoff)
+  settings_store.py      # サーバー URL の保存(user_data/settings.json)。Web / Forge / CLI / ComfyUI で共有
   history_store.py       # Forge 用サーバー側履歴(user_data/history.json) + CSV 互換
   app_web.py / run.py    # Web / CLI エントリ(sys.path シム + 絶対 import)
   web/                   # FastAPI が配信する vanilla JS GUI
@@ -79,17 +93,21 @@ user_data/               # サーバー側履歴。gitignore
 5. **整形・検証** — `constrain.py::render`(タグを並べ替えずに文字列化)と `constrain.py::validate`(二重スペースなど機械的なチェックのみ)
 6. **ネガティブ付与** — `config.NEGATIVE_PROMPT` の固定テンプレートを結果に添える
 
-**LLM サーバーは llama-server 1本のみ**。OpenAI 互換の `/v1/chat/completions` を `config.CHAT_URL` 経由で叩く。README / `anima_pipeline/README.md` / `run.py` docstring には `:8080` と書かれているが、実際の `config.py` および `run_llm.bat`/`run_llm_E2B.bat` は **ポート8088**。新しく手を加える際は `config.py` 側を正とし、README の `:8080` を写さない。
+**LLM サーバーは llama-server 1本のみ**。OpenAI 互換の `/v1/chat/completions` を叩く。既定ポートは **8088**(`config.py` / `run_llm.bat`)。
 
-**import 規約**: パッケージ内部(`pipeline.py` など)は相対 import。エントリ(`run.py` / `app_web.py` / Forge の `scripts/`)はリポジトリルートを `sys.path` に入れるシム + `from anima_pipeline import ...`。`__init__.py` はサブモジュールを import しない(軽量)。
+**サーバー URL の解決**: `config.CHAT_URL` は既定値にすぎない。優先順位は「`run(chat_url=)` / CLI `--server` > `settings_store.get_chat_url()`(`user_data/settings.json`、Web GUI・Forge の入力欄、ComfyUI ノードの `save_server_url` で保存) > `config.CHAT_URL`」。`ChatClient` は URL を **呼び出し時**に解決する(import 時固定にしない)ので、`service.py` のキャッシュキーに URL は含めない。UI は URL を直接 `config` から読まず、必ず `settings_store.get_chat_url()` を使う。Web は `GET/PUT /api/settings`、Forge は「サーバー設定」アコーディオン(タブ load 時に保存値を再読込)、ComfyUI は `server_url` / `save_server_url` 入力(詳細は下の「ComfyUI ノード」)。
+
+**import 規約**: パッケージ内部(`pipeline.py` など)は相対 import。ComfyUI 側(`comfyui/nodes.py`)もパッケージ相対 import のみ(`from ..anima_pipeline import ...`)で、**絶対 `import anima_pipeline` は禁止**(ComfyUI はリポジトリを `<パス由来名>` のパッケージとしてロードし sys.path に足さない。絶対 import を混ぜると config が二重化する)。ルート `__init__.py` は ComfyUI 専用で、Forge/CLI/Web は読まず、重い import もしない。エントリ(`run.py` / `app_web.py` / Forge の `scripts/`)はリポジトリルートを `sys.path` に入れるシム + `from anima_pipeline import ...`。`__init__.py` はサブモジュールを import しない(軽量)。
 
 **Web GUI**(`anima_pipeline/app_web.py`): FastAPI + uvicorn(:7865)。`GET /api/status` は辞書ファイルの有無と Gemma の `/v1/models` 疎通を返す。`POST /api/generate` は `service.get_pipeline(fuzzy_cutoff)` + `pipe.run(..., temperature, max_tokens, translate)`。静的ファイルは `web/`(vanilla JS)。履歴は **ブラウザ localStorage**(キー `anima_prompt_history`)と CSV インポート/エクスポート(BOM 付き UTF-8、列: Name, Datetime, JaPrompt, ExtraTags, English, Anima, Negative, Temperature, MaxTokens, FuzzyCutoff, TranslateFirst)。
 
 **Forge NEO 拡張**: 本リポジトリ自体を拡張化する(別コピーしない)。`install.py` は起動時に `pyahocorasick`/`rapidfuzz` だけ入れる(失敗しても Forge 起動は止めない)。タブ構築時は重い `service`/`pipeline` を import せず、生成ボタンのハンドラ内まで遅延させる。履歴は `history_store.py` が `user_data/history.json` に保存し、上記 CSV 列と相互運用する。送信は `javascript/anima_prompt_pipeline.js` がボタン `elem_id` に DOM `onclick` を付け、ソース textarea を自分で読んで `updateInput` + `switch_to_*` する。ジャンクション時は `on_before_ui` が `javascript/` の realpath を `cmd_opts.gradio_allowed_path` に足す(Gradio 4 がジャンクションを resolve して `/file=` が 403 になるのを防ぐ)。対象は Forge NEO(`C:\aiwork\sd-webui-forge-neo`、Gradio 4 / Python 3.13)。同居の reForge は Gradio 3 / Python 3.10 で別物。
 
+**ComfyUI ノード**: `comfyui/nodes.py`。`service`(ahocorasick 要求)は `generate` 内で遅延 import し、ImportError は「ComfyUI の Python で pip install -r requirements.txt」の RuntimeError にする(未導入でもノード登録は成功)。ルート `requirements.txt` は ComfyUI の Python 向け(requests / pyahocorasick / rapidfuzz。pandas は含まない)で、以前の「requests のみ」から役割が変わった。`seed` は `run(seed=)` から翻訳・生成の両方の llama-server payload に渡す(None なら送らない。CLI/Web/Forge は無変更)。`OUTPUT_NODE=True` かつ `IS_CHANGED` 無しなので、同じ入力は ComfyUI のキャッシュで再実行されず、seed を変えると再生成される。`server_url` は空なら `settings_store.get_chat_url()`、非空なら `normalize_chat_url` で検証して使い、`save_server_url=True` かつ非空のときだけ `set_chat_url` で保存する。
+
 **パイプラインキャッシュ**(`service.py`): `AnimaPipeline()` は辞書ロード + Aho-Corasick 構築が重い。`fuzzy_cutoff` が変わらない限り使い回す。比較は `None` を `config.SNAP_FUZZY_CUTOFF` に解決してから行う(未解決のまま比較すると常にキャッシュミスする)。temperature / max_tokens / translate はキャッシュキーに含めない。`ChatClient.chat` のこれらのデフォルトも **呼び出し時**に `config` から解決する(import 時固定はしない)。
 
-**設定はすべて `anima_pipeline/config.py` に集約**。主な項目: `CHAT_URL`、`TRANSLATE_FIRST`(既定 True)、`USE_FEWSHOT`、`USE_ARTIST_DICT`/`USE_CHAR_DICT`(辞書ファイルが無ければ自動的に無効)、`GEN_TEMPERATURE`/`GEN_MAX_TOKENS`、`SNAP_MAX_WORDS`/`SNAP_FUZZY_CUTOFF`、`NEGATIVE_PROMPT`、`STATIC_TAGS`。
+**設定はすべて `anima_pipeline/config.py` に集約**。主な項目: `CHAT_URL`(既定値。上記の通りユーザー設定で上書き可)、`TRANSLATE_FIRST`(既定 True)、`USE_FEWSHOT`、`USE_ARTIST_DICT`/`USE_CHAR_DICT`(辞書ファイルが無ければ自動的に無効)、`GEN_TEMPERATURE`/`GEN_MAX_TOKENS`、`SNAP_MAX_WORDS`/`SNAP_FUZZY_CUTOFF`、`NEGATIVE_PROMPT`、`STATIC_TAGS`。
 
 `build_anima_dictionary.py`(ルート直下)は Danbooru/Gelbooru の生 CSV(列: `tag_string`, `category_int64`, `count_int64`, `alias_string`)からカテゴリ/出現数でフィルタし、Gelbooru を優先して統合、`anima_tags.jsonl` / `alias_to_canonical.json` / `vocab.txt` を `anima_pipeline/data/dict*` へ出力する独立 CLI。辞書パスはルートの `/data/` ではない。一般辞書は必須、artist/char は任意。
 

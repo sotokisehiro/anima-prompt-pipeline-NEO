@@ -25,7 +25,7 @@ import requests
 
 from modules import script_callbacks
 
-from anima_pipeline import config
+from anima_pipeline import config, settings_store
 from anima_pipeline.history_store import HistoryStore
 
 # 履歴ストアは標準ライブラリのみで完結する軽量オブジェクトなので、モジュール読み込み時
@@ -65,18 +65,19 @@ def _status_text(check_server: bool) -> str:
     dict_ok = config.ALIAS_MAP.exists()
     dict_line = "✅ 辞書: 読み込み可能" if dict_ok else "❌ 辞書: 見つかりません(README の手順で作成してください)"
 
+    chat_url = settings_store.get_chat_url()
     if check_server:
         try:
-            res = requests.get(f"{config.CHAT_URL}/v1/models", timeout=1.0)
+            res = requests.get(f"{chat_url}/v1/models", timeout=1.0)
             server_ok = res.ok
         except Exception:
             server_ok = False
         if server_ok:
-            server_line = f"✅ Gemma サーバー ({config.CHAT_URL}): 接続OK"
+            server_line = f"✅ Gemma サーバー ({chat_url}): 接続OK"
         else:
-            server_line = f"❌ Gemma サーバー ({config.CHAT_URL}): 接続できません(llama-server を起動してください)"
+            server_line = f"❌ Gemma サーバー ({chat_url}): 接続できません(llama-server の起動と URL を確認してください)"
     else:
-        server_line = f"⏳ Gemma サーバー ({config.CHAT_URL}): 未確認"
+        server_line = f"⏳ Gemma サーバー ({chat_url}): 未確認"
 
     return f"{dict_line}  \n{server_line}"
 
@@ -95,6 +96,7 @@ def _generate(ja, tags_str, temp, max_tok, cutoff, translate):
         raise gr.Error(f"依存パッケージが不足しています: {e}")
 
     extra = [t.strip() for t in (tags_str or "").split(",") if t.strip()]
+    chat_url = settings_store.get_chat_url()
     try:
         pipe = service.get_pipeline(int(cutoff))
         res = pipe.run(
@@ -103,13 +105,32 @@ def _generate(ja, tags_str, temp, max_tok, cutoff, translate):
             temperature=float(temp),
             max_tokens=int(max_tok),
             translate=bool(translate),
+            chat_url=chat_url,
         )
     except requests.exceptions.RequestException:
-        raise gr.Error(f"Gemma サーバー ({config.CHAT_URL}) に接続できません。llama-server を起動してください。")
+        raise gr.Error(f"Gemma サーバー ({chat_url}) に接続できません。llama-server の起動とサーバー設定の URL を確認してください。")
 
     issues = res.get("issues") or []
     issues_text = "; ".join(issues) if issues else "問題なし"
     return res["english"], res["prompt"], res["negative"], issues_text
+
+
+def _save_server_url(url):
+    """サーバー URL を保存し、(正規化後の URL, 状態表示) を返す。空なら既定に戻す。"""
+    try:
+        saved = settings_store.set_chat_url(url)
+    except ValueError as e:
+        raise gr.Error(str(e))
+    return saved, _status_text(True)
+
+
+def _reset_server_url():
+    return _save_server_url("")
+
+
+def _reload_server_state():
+    """タブ読み込み時: 保存済み URL を入力欄へ復元し、状態を確認する。"""
+    return settings_store.get_chat_url(), _status_text(True)
 
 
 def _save_history(name, ja, tags_str, english, anima, negative, issues_text,
@@ -226,6 +247,15 @@ def on_ui_tabs():
                         value=config.TRANSLATE_FIRST,
                         label="翻訳ファースト(JP → EN)",
                     )
+                with gr.Accordion("サーバー設定", open=False):
+                    server_url = gr.Textbox(
+                        label="Gemma サーバー URL",
+                        value=settings_store.get_chat_url(),
+                        placeholder=config.CHAT_URL,
+                    )
+                    with gr.Row():
+                        server_save_btn = gr.Button("保存して接続確認", size="sm")
+                        server_reset_btn = gr.Button("既定に戻す", size="sm")
                 generate_btn = gr.Button("生成", variant="primary")
                 status_md = gr.Markdown(_status_text(False))
                 refresh_btn = gr.Button("状態を再確認", size="sm")
@@ -263,8 +293,11 @@ def on_ui_tabs():
             import_btn = gr.UploadButton("CSVインポート", file_types=[".csv"])
 
         # -- イベント配線 -----------------------------------------------------
-        anima_tab.load(fn=lambda: _status_text(True), outputs=[status_md])
+        anima_tab.load(fn=_reload_server_state, outputs=[server_url, status_md])
         refresh_btn.click(fn=lambda: _status_text(True), outputs=[status_md])
+        server_save_btn.click(fn=_save_server_url, inputs=[server_url],
+                              outputs=[server_url, status_md])
+        server_reset_btn.click(fn=_reset_server_url, outputs=[server_url, status_md])
 
         generate_btn.click(
             fn=_generate,

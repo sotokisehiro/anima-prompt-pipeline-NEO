@@ -84,6 +84,14 @@
                     <div class="accordion-content" id="settings-content">
                         <div class="settings-grid">
                             <div class="setting-item">
+                                <label for="setting-server-url">Gemma サーバー URL</label>
+                                <input type="text" id="setting-server-url" placeholder="http://127.0.0.1:8088">
+                                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                    <button class="btn btn-primary-style" id="btn-server-save" type="button">保存</button>
+                                    <button class="btn btn-copy" id="btn-server-reset" type="button">既定に戻す</button>
+                                </div>
+                            </div>
+                            <div class="setting-item">
                                 <label for="setting-temp">Temperature (生成度合い)</label>
                                 <div class="range-container">
                                     <input type="range" id="setting-temp" min="0.0" max="1.0" step="0.05" value="0.4">

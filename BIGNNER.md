@@ -18,25 +18,25 @@
 
 ### できないこと（重要！）
 **このツール自体は画像を出力しません。**
-本ツールが出力したプロンプトを、画像生成ソフト（ComfyUI や Forge NEO など）に貼り付けて画像を生成します。
+本ツールが出力したプロンプトを、画像生成ソフト（ComfyUI や Forge NEO など）に貼り付けて（ComfyUI ノード版ならつないで）画像を生成します。
 
 ---
 
-## 2. 選べる 3 つの使い方（インターフェース）
+## 2. 選べる 4 つの使い方（インターフェース）
 
-本ツールには、同じ変換処理を使う 3 つの入り口があります。自分のスタイルに合わせて選んでください。
+本ツールには、同じ変換処理を使う 4 つの入り口があります（CLI / Web GUI / Forge NEO 拡張 / ComfyUI ノード）。自分のスタイルに合わせて選んでください。ComfyUI をお使いの方は下の「D」を参照してください。
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                   日本語プロンプトを入力                         │
 └─────────────────────────────────┬────────────────────────────────┘
                                   │
-      ┌───────────────────────────┼───────────────────────────┐
-      ▼                           ▼                           ▼
-【 1. CLI (コマンド) 】      【 2. Web GUI 】      【 3. Forge NEO 拡張 】
-黒い画面（ターミナル）から   専用のブラウザ画面で       いつも使っている
-コマンド 1 行で変換         スライダー調整＆履歴管理    Forge NEO 画面内で完結
-                            (http://127.0.0.1:7865)    (txt2img へ 1 クリック送信)
+   ┌──────────────┬───────────────┴──┬──────────────────┐
+   ▼              ▼                  ▼                  ▼
+【1. CLI】     【2. Web GUI】   【3. Forge NEO 拡張】 【4. ComfyUI ノード】
+黒い画面から   ブラウザ画面で   Forge NEO 画面内で   ComfyUI のワーク
+コマンド1行    調整＆履歴管理   txt2img へ送信       フロー内で完結
+               (:7865)
 ```
 
 | 使い方 | おすすめな人 | 起動方法の目安 |
@@ -44,6 +44,7 @@
 | **1. CLI (CUI)** | コマンドライン操作に慣れている方、スクリプトから自動で呼び出したい方 | ターミナルで `python run.py "日本語"` |
 | **2. Web GUI** | コマンドを打たずにブラウザ画面でパラメータ調整や履歴管理を行いたい方 | `anima_pipeline/run_web.bat` を起動 |
 | **3. Forge NEO 拡張** | 日常的に Forge NEO で画像生成をしており、タブを行き来せず直接プロンプトを流し込みたい方 | Forge NEO の `extensions` に配置して起動 |
+| **4. ComfyUI ノード** | ComfyUI で画像生成をしており、ワークフロー内で日本語から直接プロンプトを作りたい方 | ComfyUI の `custom_nodes` に配置して再起動 |
 
 ---
 
@@ -65,7 +66,11 @@
 
 ## 4. 全体共通のセットアップ（最初に 1 回だけ行う）
 
-どの使い方（CUI / Web GUI / 拡張機能）を選ぶ場合でも、以下の準備が必要です。
+どの使い方（CLI / Web GUI / Forge 拡張 / ComfyUI ノード）を選ぶ場合でも、以下の準備が必要です。
+
+> [!TIP]
+> **Windows では一括セットアップバッチが利用できます（かんたん推奨）**
+> リポジトリのルートフォルダにある **`setup_dictionary.bat`** をダブルクリックするだけで、ステップ 1〜ステップ 3（仮想環境作成・タグ CSV 取得・3 種類の辞書ビルド）をワンクリックで自動実行できます！手動で行いたい場合は以下の手順に従ってください。
 
 > [!TIP]
 > **Windows では一括セットアップバッチが利用できます（かんたん推奨）**
@@ -111,7 +116,7 @@ python ../build_anima_dictionary.py --danbooru data/raw/danbooru.csv --gelbooru 
 **別の新しいターミナルを開き**、Gemma を起動して常駐させます（変換を行う間はずっと開いたままにしておきます）。
 
 > [!IMPORTANT]
-> ポート番号は **`8088`** を指定してください。
+> ポート番号は **`8088`** を指定してください。別のポートや別 PC の Gemma を使う場合は、Web GUI の「詳細設定」、Forge の「サーバー設定」、ComfyUI ノードの `server_url` で URL を変更できます（保存され、次回起動時も使われます）。
 
 ```bat
 llama-server -m C:\path\to\your-gemma-model.gguf --port 8088 -c 8192 -ngl 99 -ot "\.ffn_(up|down|gate)_exps\.=CPU" -fa on --jinja --reasoning-budget 0
@@ -172,11 +177,30 @@ Forge NEO の操作画面の中でそのままプロンプトを作りたい場�
 
 ---
 
+### D. ComfyUI のカスタムノードで動かす
+ComfyUI のワークフロー内で、日本語から Anima 用プロンプトまで作りたい場合の手順です。
+
+1. **ノードを置く**: ComfyUI の `custom_nodes` フォルダに本ツールのフォルダを置きます（clone、またはジャンクション）。
+   ```bat
+   mklink /J C:\ComfyUI\custom_nodes\anima-prompt-pipeline C:\path\to\anima-prompt-pipeline
+   ```
+2. **ライブラリを入れる**: **ComfyUI が使っている Python** で `pip install -r requirements.txt`（本ツールのフォルダ直下のもの）を実行します。Windows portable 版なら `python_embeded\python.exe -m pip install -r ...` です。
+3. **辞書と Gemma を用意する**: ステップ 3・4 を済ませ、llama-server を起動したままにします。
+4. **ComfyUI を再起動**し、ノード追加で「Anima Prompt Pipeline (日本語→Anima)」を探します。
+5. 日本語を入力し、出力の `prompt` と `negative` を CLIP Text Encode の text 入力につなぎます。結果は `PreviewAny` ノードにつなぐと確認できます。`seed` を変えると作り直します。
+
+---
+
 ## 6. よくあるトラブルと解決策
 
 - **「Gemma サーバーに接続できません」と出る**:
   - llama-server の黒い画面が閉じられていませんか？
   - ポート番号が `8088` になっているか確認してください（`8080` ではありません）。
+- **ComfyUI にノードが出ない**:
+  - `custom_nodes` に置いたか、ComfyUI を再起動したか、起動ログに `anima-prompt-pipeline` の import エラーが出ていないか確認してください。
+  - 「依存パッケージが不足しています」と出たら、ComfyUI の Python に `pip install -r requirements.txt` を実行してください（別の Python に入れても効きません）。
+- **ComfyUI で「Gemma サーバーに接続できません」と出る**:
+  - llama-server が起動しているか、ノードの `server_url`（空なら保存済み設定 > :8088）が正しいか確認してください。
 - **「辞書ファイルが見つかりません」と出る**:
   - ステップ 3 の「辞書を作る」を実行していないか、途中でエラーになっていませんか？ `anima_pipeline/data/dict/alias_to_canonical.json` があるか確認してください。
 - **Gemma 起動時に「Out of Memory」で落ちる**:

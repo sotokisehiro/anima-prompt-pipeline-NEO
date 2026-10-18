@@ -71,6 +71,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Gemma server URL settings (saved server-side in user_data/settings.json)
+    const settingServerUrl = document.getElementById('setting-server-url');
+    const btnServerSave = document.getElementById('btn-server-save');
+    const btnServerReset = document.getElementById('btn-server-reset');
+
+    async function loadServerSettings() {
+        try {
+            const res = await fetch('/api/settings');
+            if (!res.ok) return;
+            const data = await res.json();
+            settingServerUrl.value = data.chat_url || '';
+            settingServerUrl.placeholder = data.default_chat_url || '';
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function saveServerUrl(url) {
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_url: url })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || '保存に失敗しました。');
+            settingServerUrl.value = data.chat_url;
+            showTemporaryNotice(`サーバー URL を保存しました: ${data.chat_url}`);
+            hideSystemAlert();
+            checkStatus();
+        } catch (e) {
+            alert(e.message);
+        }
+    }
+
+    btnServerSave.addEventListener('click', () => saveServerUrl(settingServerUrl.value));
+    btnServerReset.addEventListener('click', () => saveServerUrl(''));
+
     // Check backend status on load
     async function checkStatus() {
         try {
@@ -89,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 textGemma.textContent = 'Gemma: Offline';
                 showSystemAlert(
                     'Gemma サーバーに接続できません',
-                    `設定された URL: ${data.gemma_url} に接続できません。別のターミナルで llama-server を起動しているか確認してください。<br><br><code>~/llama.cpp/build/bin/llama-server -m ~/llama.cpp/models/gemma-4-26B-A4B-it-Q4_K_M.gguf --port 8088 -c 8192 -ngl 99 -ot "\\.ffn_(up|down|gate)_exps\\.=CPU" -fa on --jinja --reasoning-budget 0</code>`
+                    `設定された URL: ${data.gemma_url} に接続できません。別のターミナルで llama-server を起動しているか確認してください。URL が違う場合は「詳細設定」のサーバー URL から変更できます。<br><br><code>~/llama.cpp/build/bin/llama-server -m ~/llama.cpp/models/gemma-4-26B-A4B-it-Q4_K_M.gguf --port 8088 -c 8192 -ngl 99 -ot "\\.ffn_(up|down|gate)_exps\\.=CPU" -fa on --jinja --reasoning-budget 0</code>`
                 );
             }
 
@@ -322,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Check status initially
+    loadServerSettings();
     checkStatus();
 
     // --- History & CSV Functionality ---

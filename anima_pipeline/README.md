@@ -21,7 +21,7 @@
 ルール定義は Gemma に渡す**プロンプト**で行い、`prompts/anima_rules.txt` を
 ユーザー間で共有・改良していく想定です(`prompts/README.md` を参照)。
 
-> 起動して使うサーバーは **Gemma(:8080)1 つだけ**です。
+> 起動して使うサーバーは **Gemma(:8088)1 つだけ**です。
 
 ---
 
@@ -94,13 +94,13 @@ python ../build_anima_dictionary.py \
 
 ### 2. Gemma サーバーを起動する
 
-起動するのは **Gemma(:8080)1 つだけ**です。確実な手順(`llama-server` のフルパス・
+起動するのは **Gemma(:8088)1 つだけ**です。確実な手順(`llama-server` のフルパス・
 `-ot` の付け方・1 行で入力・`--reasoning-budget 0`)は、トップ README の「サーバーの起動」を
 見てください。要点だけ再掲:
 
 ```bash
 ~/llama.cpp/build/bin/llama-server -m ~/llama.cpp/models/gemma-4-26B-A4B-it-Q4_K_M.gguf \
-  --port 8080 -c 8192 -ngl 99 -ot "\.ffn_(up|down|gate)_exps\.=CPU" -fa on --jinja --reasoning-budget 0
+  --port 8088 -c 8192 -ngl 99 -ot "\.ffn_(up|down|gate)_exps\.=CPU" -fa on --jinja --reasoning-budget 0
 ```
 
 (モデルのファイル名・パスは各自の環境に合わせてください。VRAM が足りないときは `-ot` を必ず付け、
@@ -139,7 +139,7 @@ print(res["issues"])     # 検証で見つかった問題(空ならOK)
 
 | 変数 | 既定 | 説明 |
 |---|---|---|
-| `CHAT_URL` | `127.0.0.1:8080` | Gemma(llama-server)のポート |
+| `CHAT_URL` | `http://127.0.0.1:8088` | Gemma(llama-server)の既定 URL。GUI / Forge の設定欄や `run.py --server` で上書きでき、保存値は `user_data/settings.json` |
 | `TRANSLATE_FIRST` | `True` | 生成の前に JP→EN 翻訳する。`False` なら日本語のまま Gemma に渡す |
 | `GEN_TEMPERATURE` | `0.4` | 生成の temperature(ルール遵守向けに低め) |
 | `GEN_MAX_TOKENS` | `2048` | 出力の最大トークン |

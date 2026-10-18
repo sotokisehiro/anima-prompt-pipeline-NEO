@@ -15,6 +15,7 @@ import uvicorn
 # プロジェクトのモジュールをインポート
 from anima_pipeline import config
 from anima_pipeline import service
+from anima_pipeline import settings_store
 
 app = FastAPI(title="Anima Prompt Pipeline Web UI")
 
@@ -29,17 +30,36 @@ class GenerateRequest(BaseModel):
     fuzzy_cutoff: int | None = None
     translate_first: bool | None = None
 
+class SettingsRequest(BaseModel):
+    chat_url: str = ""
+
+@app.get("/api/settings")
+def get_settings():
+    return {
+        "chat_url": settings_store.get_chat_url(),
+        "default_chat_url": config.CHAT_URL,
+    }
+
+@app.put("/api/settings")
+def put_settings(req: SettingsRequest):
+    try:
+        url = settings_store.set_chat_url(req.chat_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"chat_url": url, "default_chat_url": config.CHAT_URL}
+
 @app.get("/api/status")
 def get_status():
     # 辞書のチェック
     dict_exists = config.ALIAS_MAP.exists()
-    
+    chat_url = settings_store.get_chat_url()
+
     # Gemmaサーバーのチェック
     gemma_online = False
     try:
         # llama-serverのモデル一覧取得を試みる
         # タイムアウトは1.0秒にしてレスポンスを早くする
-        r = requests.get(f"{config.CHAT_URL}/v1/models", timeout=1.0)
+        r = requests.get(f"{chat_url}/v1/models", timeout=1.0)
         if r.status_code == 200:
             gemma_online = True
     except Exception:
@@ -48,7 +68,7 @@ def get_status():
     return {
         "dictionary_exists": dict_exists,
         "gemma_online": gemma_online,
-        "gemma_url": config.CHAT_URL,
+        "gemma_url": chat_url,
         "alias_map_path": str(config.ALIAS_MAP),
     }
 
@@ -60,17 +80,18 @@ def generate_prompt(req: GenerateRequest):
             detail="辞書ファイルが見つかりません。先に辞書を作成してください。"
         )
         
+    chat_url = settings_store.get_chat_url()
     try:
         pipe = service.get_pipeline(req.fuzzy_cutoff)
         res = pipe.run(req.prompt, extra_tags=req.extra_tags,
                        temperature=req.temperature, max_tokens=req.max_tokens,
-                       translate=req.translate_first)
+                       translate=req.translate_first, chat_url=chat_url)
         return res
 
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         raise HTTPException(
             status_code=503,
-            detail=f"Gemma サーバー({config.CHAT_URL})に接続できません。llama-server が起動しているか確認してください。"
+            detail=f"Gemma サーバー({chat_url})に接続できません。llama-server が起動しているか、詳細設定のサーバー URL が正しいか確認してください。"
         )
     except Exception as e:
         raise HTTPException(

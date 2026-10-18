@@ -6,19 +6,25 @@ OpenAI 互換の /v1/chat/completions エンドポイントを使う。`response
 from __future__ import annotations
 import requests
 
-from . import config
+from . import config, settings_store
 
 
 class ChatClient:
-    def __init__(self, base_url: str = config.CHAT_URL, timeout: int = 300):
-        self.base = base_url.rstrip("/")
+    def __init__(self, base_url: str | None = None, timeout: int = 300):
+        # None のときは呼び出し時に settings_store(保存値 > config.CHAT_URL)から解決する。
+        self.base_url = base_url
         self.timeout = timeout
+
+    def _resolve_base(self, base_url: str | None) -> str:
+        return (base_url or self.base_url or settings_store.get_chat_url()).rstrip("/")
 
     def chat(self, messages: list[dict], response_format: dict | None = None,
              grammar: str | None = None,
              temperature: float | None = None,
              max_tokens: int | None = None,
-             top_p: float = 0.95, top_k: int = 64) -> str:
+             top_p: float = 0.95, top_k: int = 64,
+             base_url: str | None = None,
+             seed: int | None = None) -> str:
         if temperature is None:
             temperature = config.GEN_TEMPERATURE
         if max_tokens is None:
@@ -31,11 +37,13 @@ class ChatClient:
             "max_tokens": max_tokens,
             "stream": False,
         }
+        if seed is not None:
+            payload["seed"] = seed                # llama-server の拡張(再現性用)
         if response_format is not None:
             payload["response_format"] = response_format
         if grammar is not None:
             payload["grammar"] = grammar          # llama-server の拡張
-        r = requests.post(f"{self.base}/v1/chat/completions",
+        r = requests.post(f"{self._resolve_base(base_url)}/v1/chat/completions",
                           json=payload, timeout=self.timeout)
         r.raise_for_status()
         msg = r.json()["choices"][0]["message"]
@@ -46,7 +54,9 @@ class ChatClient:
             content = (msg.get("reasoning_content") or "").strip()
         return content
 
-    def translate_ja_en(self, ja_text: str, temperature: float = 0.1) -> str:
+    def translate_ja_en(self, ja_text: str, temperature: float = 0.1,
+                        base_url: str | None = None,
+                        seed: int | None = None) -> str:
         messages = [
             {"role": "system", "content":
                 "You are a translator. Translate the user's Japanese image "
@@ -54,4 +64,5 @@ class ChatClient:
                 "translation: no notes, no quotes, no explanation."},
             {"role": "user", "content": ja_text},
         ]
-        return self.chat(messages, temperature=temperature, max_tokens=300).strip()
+        return self.chat(messages, temperature=temperature, max_tokens=300,
+                         base_url=base_url, seed=seed).strip()
